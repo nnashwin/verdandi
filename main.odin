@@ -21,13 +21,14 @@ clear_screen :: proc() {
 // ============================================================================
 engine: ma.engine
 
-init_audio :: proc() {
+init_audio_and_check_validity :: proc() -> bool {
 	config := ma.engine_config_init()
 	if ma.engine_init(&config, &engine) != .SUCCESS {
 		// handle error
-		return
+		return false
 	}
 	ma.engine_start(&engine)
+	return true
 }
 
 cleanup_audio :: proc() {
@@ -45,7 +46,7 @@ play_file :: proc(path: cstring) {
 // CLI Flags Start
 // ============================================================================
 Options :: struct {
-	audio_file_path: string `args:"name=audio-file-path"`,
+	custom_audio_file_path: string `args:"name=audio_file_path" usage:"sets custom audio file path"`,
 }
 // ============================================================================
 // CLI Flags End
@@ -53,18 +54,39 @@ Options :: struct {
 
 
 main :: proc() {
+	is_audio_initted := init_audio_and_check_validity()
+	if is_audio_initted {
+		fmt.println("audio is initted")
+	} else {
+		fmt.println("audio could not init")
+	}
+
+	sound: ma.sound
+	result := ma.sound_init_from_file(
+		&engine,
+		"./default-sound-effects/lets-fight-like-gentlemen.wav",
+		nil,
+		nil,
+		nil,
+		&sound,
+	)
+
+	if result == .SUCCESS {
+		ma.sound_set_looping(&sound, true)
+		ma.sound_start(&sound)
+	}
+
 	opts: Options
 
 	flags.parse_or_exit(&opts, os.args, .Unix)
 
-	if (opts.audio_file_path == "") {
-		fmt.println("there is no audio path")
-		return
-	} else {
-		fmt.printfln("the following audio path was found: %s", opts.audio_file_path)
+	if opts.custom_audio_file_path != "" {
+		fmt.printfln(
+			"verdandi will now use '%s' as the audio file when the timer is complete",
+			opts.custom_audio_file_path,
+		)
 		return
 	}
-
 	// sets the terminal apperance to raw and not cooked to turn off default echo behavior and treat it more like a game engine
 	enable_raw_mode()
 	defer disable_raw_mode()
@@ -77,10 +99,14 @@ main :: proc() {
 		if n <= 0 do break
 		if err != nil {
 			fmt.print("You have encountered an error reading os.stdin.  ending the process. \r\n")
+			break
 		}
 
 		c := buf[0]
-		if c == 'q' do break
+		if c == 'q' {
+			ma.sound_stop(&sound)
+			break
+		}
 
 		if c >= 32 && c < 127 {
 			fmt.printf("%d, ('%c')\r\n", c, rune(c))
