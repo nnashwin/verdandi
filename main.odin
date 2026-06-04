@@ -6,29 +6,50 @@ import "core:os"
 
 import ma "vendor:miniaudio"
 
-// visual handling
-CLEAR_SCREEN_CHAR :: "\x1b[2J"
-ALTERNATE_SCREEN_BUFFER_CHAR :: "\x1b[?1049h"
+// ============================================================================
+// Constants Start
+// ============================================================================
+CONFIG_DIR :: "verdandi"
 // move cursor to home (top-left)
 CURSOR_HOME_CHAR :: "\x1b[H"
 
+ENTER_ALT_SCREEN :: "\x1b[?1049h"
+LEAVE_ALT_SCREEN :: "\x1b[?1049l" // lowercase L
+
+CLEAR_SCREEN_CHAR :: "\x1b[2J"
+
+// ============================================================================
+// Constants End
+// ============================================================================
+
+// ============================================================================
+// Video Processing Start
+// ============================================================================
 clear_screen :: proc() {
 	os.write_string(os.stdout, CLEAR_SCREEN_CHAR + CURSOR_HOME_CHAR)
 }
+// ============================================================================
+// Video Processing End
+// ============================================================================
 
 // ============================================================================
 // Audio Processing Code Start
 // ============================================================================
 engine: ma.engine
+sound: ma.sound
 
-init_audio_and_check_validity :: proc() -> bool {
+init_audio :: proc() -> ma.result {
 	config := ma.engine_config_init()
-	if ma.engine_init(&config, &engine) != .SUCCESS {
-		// handle error
-		return false
+	init_result := ma.engine_init(&config, &engine)
+	if init_result != .SUCCESS do return init_result
+
+	start_result := ma.engine_start(&engine)
+	if start_result != .SUCCESS {
+		ma.engine_uninit(&engine)
+		return start_result
 	}
-	ma.engine_start(&engine)
-	return true
+
+	return .SUCCESS
 }
 
 cleanup_audio :: proc() {
@@ -42,26 +63,47 @@ play_file :: proc(path: cstring) {
 // Audio Processing Code End
 // ============================================================================
 
-// ============================================================================
-// CLI Flags Start
-// ============================================================================
 Options :: struct {
 	custom_audio_file_path: string `args:"name=audio_file_path" usage:"sets custom audio file path"`,
 }
-// ============================================================================
-// CLI Flags End
-// ============================================================================
 
+// ============================================================================
+// Config Code Start
+// ============================================================================
+Config :: struct {
+	audio_file_path: string,
+}
 
-main :: proc() {
-	is_audio_initted := init_audio_and_check_validity()
-	if is_audio_initted {
-		fmt.println("audio is initted")
+get_config_dir :: proc() -> string {
+	when ODIN_OS == .Windows {
+		base := os.get_env_alloc("APPDATA", context.temp_allocator)
 	} else {
-		fmt.println("audio could not init")
+		base := os.get_env_alloc("HOME", context.temp_allocator)
+		base = fmt.tprintf("%s/.config", base)
 	}
 
-	sound: ma.sound
+	return fmt.tprintf("%s/%s", base, CONFIG_DIR)
+}
+
+// ============================================================================
+// Config Code End
+// ============================================================================
+
+main :: proc() {
+	audio_result := init_audio()
+	if audio_result != .SUCCESS {
+		fmt.printfln(
+			"audio could not init for your device for the following reason: %v.  Please resolve and try again",
+			audio_result,
+		)
+		return
+	}
+
+	defer cleanup_audio()
+
+	// load config
+
+
 	result := ma.sound_init_from_file(
 		&engine,
 		"./default-sound-effects/lets-fight-like-gentlemen.wav",
@@ -91,6 +133,10 @@ main :: proc() {
 	enable_raw_mode()
 	defer disable_raw_mode()
 
+	// enter alt screen so that we can restore the previous terminal once the tui is finished
+	os.write_string(os.stdout, ENTER_ALT_SCREEN)
+	defer os.write_string(os.stdout, LEAVE_ALT_SCREEN)
+
 	clear_screen()
 
 	buf: [1]byte
@@ -103,7 +149,7 @@ main :: proc() {
 		}
 
 		c := buf[0]
-		if c == 'q' {
+		if c == 'q' || c == 3 {
 			ma.sound_stop(&sound)
 			break
 		}
