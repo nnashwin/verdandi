@@ -3,20 +3,23 @@ package main
 import "core:flags"
 import "core:fmt"
 import "core:os"
+import "core:path/filepath"
 
 import ma "vendor:miniaudio"
 
 // ============================================================================
 // Constants Start
 // ============================================================================
+CLEAR_SCREEN_CHAR :: "\x1b[2J"
 CONFIG_DIR :: "verdandi"
 // move cursor to home (top-left)
 CURSOR_HOME_CHAR :: "\x1b[H"
 
+CUSTOM_SOUND_FILE :: #load("./default-sound-effects/perfect.mp3")
+
 ENTER_ALT_SCREEN :: "\x1b[?1049h"
 LEAVE_ALT_SCREEN :: "\x1b[?1049l" // lowercase L
 
-CLEAR_SCREEN_CHAR :: "\x1b[2J"
 
 // ============================================================================
 // Constants End
@@ -35,6 +38,8 @@ clear_screen :: proc() {
 // ============================================================================
 // Audio Processing Code Start
 // ============================================================================
+decoder: ma.decoder
+dec_config: ma.decoder_config
 engine: ma.engine
 sound: ma.sound
 
@@ -53,6 +58,8 @@ init_audio :: proc() -> ma.result {
 }
 
 cleanup_audio :: proc() {
+	ma.sound_uninit(&sound)
+	ma.decoder_uninit(&decoder)
 	ma.engine_uninit(&engine)
 }
 
@@ -90,33 +97,21 @@ get_config_dir :: proc() -> string {
 // ============================================================================
 
 main :: proc() {
-	audio_result := init_audio()
-	if audio_result != .SUCCESS {
-		fmt.printfln(
-			"audio could not init for your device for the following reason: %v.  Please resolve and try again",
-			audio_result,
-		)
-		return
+	dir_name := get_config_dir()
+
+	config_file_name, _ := filepath.join({dir_name, "config.json"})
+
+	if !os.exists(config_file_name) {
+		err := os.write_entire_file(config_file_name, `{
+        audio_file_path: ''
+    }`)
+		if err != nil {
+			fmt.printfln("config init could not be completed with the following error: %v", err)
+			return
+		}
 	}
 
 	defer cleanup_audio()
-
-	// load config
-
-
-	result := ma.sound_init_from_file(
-		&engine,
-		"./default-sound-effects/lets-fight-like-gentlemen.wav",
-		nil,
-		nil,
-		nil,
-		&sound,
-	)
-
-	if result == .SUCCESS {
-		ma.sound_set_looping(&sound, true)
-		ma.sound_start(&sound)
-	}
 
 	opts: Options
 
@@ -129,6 +124,37 @@ main :: proc() {
 		)
 		return
 	}
+
+
+	// initialize audio
+	audio_result := init_audio()
+	if audio_result != .SUCCESS {
+		fmt.printfln(
+			"audio could not init for your device for the following reason: %v.  Please resolve and try again",
+			audio_result,
+		)
+		return
+	}
+
+	result := ma.decoder_init_memory(
+		raw_data(CUSTOM_SOUND_FILE),
+		len(CUSTOM_SOUND_FILE),
+		&dec_config,
+		&decoder,
+	)
+
+	if result == .SUCCESS {
+		ma.sound_init_from_data_source(&engine, decoder.ds.pCurrent, {}, nil, &sound)
+		ma.sound_set_looping(&sound, true)
+		ma.sound_start(&sound)
+	} else {
+		fmt.printfln(
+			"The audio was not able to be initialized with the following error: %v",
+			result,
+		)
+		return
+	}
+
 	// sets the terminal apperance to raw and not cooked to turn off default echo behavior and treat it more like a game engine
 	enable_raw_mode()
 	defer disable_raw_mode()
@@ -138,6 +164,7 @@ main :: proc() {
 	defer os.write_string(os.stdout, LEAVE_ALT_SCREEN)
 
 	clear_screen()
+
 
 	buf: [1]byte
 	for {
