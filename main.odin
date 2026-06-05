@@ -1,9 +1,11 @@
 package main
 
+import "core:encoding/json"
 import "core:flags"
 import "core:fmt"
 import "core:os"
 import "core:path/filepath"
+import "core:strings"
 
 import ma "vendor:miniaudio"
 
@@ -15,7 +17,7 @@ CONFIG_DIR :: "verdandi"
 // move cursor to home (top-left)
 CURSOR_HOME_CHAR :: "\x1b[H"
 
-CUSTOM_SOUND_FILE :: #load("./default-sound-effects/perfect.mp3")
+DEFAULT_SOUND_FILE :: #load("./default-sound-effects/perfect.mp3")
 
 ENTER_ALT_SCREEN :: "\x1b[?1049h"
 LEAVE_ALT_SCREEN :: "\x1b[?1049l" // lowercase L
@@ -78,7 +80,7 @@ Options :: struct {
 // Config Code Start
 // ============================================================================
 Config :: struct {
-	audio_file_path: string,
+	has_custom_audio_file: bool,
 }
 
 get_config_dir :: proc() -> string {
@@ -96,32 +98,120 @@ get_config_dir :: proc() -> string {
 // Config Code End
 // ============================================================================
 
+// ============================================================================
+// Parse Sound File Start
+// ============================================================================
+validate_audio_file :: proc(path: string) -> (valid: bool, err: ma.result) {
+	cpath := strings.clone_to_cstring(path, context.temp_allocator)
+
+	test_decoder: ma.decoder
+	dec_config: ma.decoder_config
+	result := ma.decoder_init_file(cpath, &dec_config, &test_decoder)
+	if result != .SUCCESS {
+		return false, result
+	}
+
+	ma.decoder_uninit(&test_decoder)
+
+	return true, .SUCCESS
+}
+// ============================================================================
+// Parse Sound File End
+// ============================================================================
+
+
 main :: proc() {
-	dir_name := get_config_dir()
+	// see if config directory exists
+	config_dir_name := get_config_dir()
 
-	config_file_name, _ := filepath.join({dir_name, "config.json"})
+	config_file_name, _ := filepath.join({config_dir_name, "config.json"})
 
-	if !os.exists(config_file_name) {
-		err := os.write_entire_file(config_file_name, `{
-        audio_file_path: ''
-    }`)
+	config: Config
+
+	if !os.exists(config_dir_name) {
+
+		err := os.make_directory_all(config_dir_name)
+		if err != nil {
+			fmt.printfln(
+				"the config directory could not be completed with the following error: %v",
+				err,
+			)
+		}
+
+		config = Config{}
+
+		// since this is just a 0 value for a struct, should be able to initialize with no error and not worry about it
+		data, _ := json.marshal(config)
+
+		err = os.write_entire_file(config_file_name, data)
 		if err != nil {
 			fmt.printfln("config init could not be completed with the following error: %v", err)
 			return
 		}
+	} else {
+		data, err := os.read_entire_file(config_file_name, context.temp_allocator)
+		if err != nil {
+			fmt.println("config file not found; falling back to default sound")
+			config = Config{}
+		}
+
+		unmarshal_err := json.unmarshal(data, &config)
+		if unmarshal_err != nil {
+			fmt.println("could not parse config; falling back to default sound")
+			config = Config{}
+		}
 	}
 
-	defer cleanup_audio()
-
+	// parse cli flags
 	opts: Options
 
 	flags.parse_or_exit(&opts, os.args, .Unix)
 
 	if opts.custom_audio_file_path != "" {
+		valid, ma_err_result := validate_audio_file(opts.custom_audio_file_path)
+		if !valid {
+			fmt.printfln(
+				"invalid custom audio file for the following reason: %v.  please choose another file",
+				ma_err_result,
+			)
+		}
+
+		// copy file to custom path
+		data, err := os.read_entire_file(opts.custom_audio_file_path, context.temp_allocator)
+		if err != nil {
+			fmt.printfln(
+				"the custom file could not be read from %s.  please update the path and try again",
+				opts.custom_audio_file_path,
+			)
+			return
+		}
+
+		file_ext := filepath.ext(opts.custom_audio_file_path)
+
+		custom_file_name := strings.join({"custom-audio-file", file_ext}, "")
+
+		path, _ := filepath.join({config_dir_name, custom_file_name})
+
+		err = os.write_entire_file(path, data)
+		if err != nil {
+			fmt.printfln(
+				"custom audio file could not be copied from %s to %s.  please check the file and try again",
+				opts.custom_audio_file_path,
+				path,
+			)
+			return
+		}
+
+		// TODO: Add writing the config and playing the custom file instead of default
+
+
+		// this needs to go at the end once all file operations and seeing if the audio file is valid are complete
 		fmt.printfln(
 			"verdandi will now use '%s' as the audio file when the timer is complete",
 			opts.custom_audio_file_path,
 		)
+
+
 		return
 	}
 
@@ -136,9 +226,11 @@ main :: proc() {
 		return
 	}
 
+	defer cleanup_audio()
+
 	result := ma.decoder_init_memory(
-		raw_data(CUSTOM_SOUND_FILE),
-		len(CUSTOM_SOUND_FILE),
+		raw_data(DEFAULT_SOUND_FILE),
+		len(DEFAULT_SOUND_FILE),
 		&dec_config,
 		&decoder,
 	)
