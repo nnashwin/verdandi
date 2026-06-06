@@ -265,8 +265,6 @@ main :: proc() {
 			&dec_config,
 			&decoder,
 		)
-
-
 	}
 
 	if result == .SUCCESS {
@@ -292,6 +290,12 @@ main :: proc() {
 
 	clear_screen()
 
+	for d in 0 ..< 4 {
+		fmt.printf("--- %d ---\r\n", d)
+		for line in DIGITS[d] {
+			fmt.printf("|%s|\r\n", line) // pipes show exact width
+		}
+	}
 
 	buf: [1]byte
 	for {
