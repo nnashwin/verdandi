@@ -80,7 +80,8 @@ Options :: struct {
 // Config Code Start
 // ============================================================================
 Config :: struct {
-	has_custom_audio_file: bool,
+	has_custom_audio_file:       bool,
+	custom_audio_file_extension: string,
 }
 
 get_config_dir :: proc() -> string {
@@ -162,6 +163,7 @@ main :: proc() {
 		}
 	}
 
+
 	// parse cli flags
 	opts: Options
 
@@ -176,7 +178,7 @@ main :: proc() {
 			)
 		}
 
-		// copy file to custom path
+		// copy file to custom path; handle errors if failed
 		data, err := os.read_entire_file(opts.custom_audio_file_path, context.temp_allocator)
 		if err != nil {
 			fmt.printfln(
@@ -202,7 +204,17 @@ main :: proc() {
 			return
 		}
 
-		// TODO: Add writing the config and playing the custom file instead of default
+		// flip config to have custom audio file now that it's been copied to the correct spot
+		config.has_custom_audio_file = true
+		config.custom_audio_file_extension = file_ext
+
+		data, _ = json.marshal(config)
+
+		err = os.write_entire_file(config_file_name, data)
+		if err != nil {
+			fmt.printfln("config init could not be completed with the following error: %v", err)
+			return
+		}
 
 
 		// this needs to go at the end once all file operations and seeing if the audio file is valid are complete
@@ -228,12 +240,34 @@ main :: proc() {
 
 	defer cleanup_audio()
 
-	result := ma.decoder_init_memory(
-		raw_data(DEFAULT_SOUND_FILE),
-		len(DEFAULT_SOUND_FILE),
-		&dec_config,
-		&decoder,
-	)
+	result: ma.result
+
+	if (config.has_custom_audio_file) {
+		custom_file_name := strings.join(
+			{"custom-audio-file", config.custom_audio_file_extension},
+			"",
+		)
+
+		path, err := filepath.join({config_dir_name, custom_file_name})
+
+		if err != nil {
+			fmt.printfln("filepath could not be created with the following error")
+		}
+
+		cpath := strings.clone_to_cstring(path, context.temp_allocator)
+
+		result = ma.decoder_init_file(cpath, &dec_config, &decoder)
+
+	} else {
+		result = ma.decoder_init_memory(
+			raw_data(DEFAULT_SOUND_FILE),
+			len(DEFAULT_SOUND_FILE),
+			&dec_config,
+			&decoder,
+		)
+
+
+	}
 
 	if result == .SUCCESS {
 		ma.sound_init_from_data_source(&engine, decoder.ds.pCurrent, {}, nil, &sound)
@@ -246,6 +280,7 @@ main :: proc() {
 		)
 		return
 	}
+
 
 	// sets the terminal apperance to raw and not cooked to turn off default echo behavior and treat it more like a game engine
 	enable_raw_mode()
