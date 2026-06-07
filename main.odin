@@ -82,7 +82,6 @@ Options :: struct {
 // Config Code Start
 // ============================================================================
 Config :: struct {
-	has_custom_audio_file:       bool,
 	custom_audio_file_extension: string,
 }
 
@@ -154,7 +153,6 @@ main :: proc() {
 			}
 		}
 
-		config.has_custom_audio_file = true
 		config.custom_audio_file_extension = ".mp3"
 
 		// since this is just a 0 value for a struct, should be able to initialize with no error and not worry about it
@@ -223,7 +221,6 @@ main :: proc() {
 		}
 
 		// flip config to have custom audio file now that it's been copied to the correct spot
-		config.has_custom_audio_file = true
 		config.custom_audio_file_extension = file_ext
 
 		data, _ = json.marshal(config)
