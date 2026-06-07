@@ -6,6 +6,7 @@ import "core:fmt"
 import "core:os"
 import "core:path/filepath"
 import "core:strings"
+import "core:time"
 
 import ma "vendor:miniaudio"
 
@@ -17,7 +18,8 @@ CONFIG_DIR :: "verdandi"
 // move cursor to home (top-left)
 CURSOR_HOME_CHAR :: "\x1b[H"
 
-DEFAULT_SOUND_FILE :: #load("./default-sound-effects/perfect.mp3")
+DEFAULT_SOUND :: #load("./default-sound-effects/perfect.mp3")
+DEFAULT_SOUND_FILE :: "custom-audio-file.mp3"
 
 ENTER_ALT_SCREEN :: "\x1b[?1049h"
 LEAVE_ALT_SCREEN :: "\x1b[?1049l" // lowercase L
@@ -130,7 +132,6 @@ main :: proc() {
 	config: Config
 
 	if !os.exists(config_dir_name) {
-
 		err := os.make_directory_all(config_dir_name)
 		if err != nil {
 			fmt.printfln(
@@ -139,7 +140,22 @@ main :: proc() {
 			)
 		}
 
-		config = Config{}
+
+		// write default sound file to directory
+		path, _ := filepath.join({config_dir_name, DEFAULT_SOUND_FILE})
+
+		if !os.exists(path) {
+			err := os.write_entire_file(path, DEFAULT_SOUND)
+			if err != nil {
+				fmt.printfln(
+					"could not write the default sound file to the config directory with the following error: %v",
+					err,
+				)
+			}
+		}
+
+		config.has_custom_audio_file = true
+		config.custom_audio_file_extension = ".mp3"
 
 		// since this is just a 0 value for a struct, should be able to initialize with no error and not worry about it
 		data, _ := json.marshal(config)
@@ -149,6 +165,8 @@ main :: proc() {
 			fmt.printfln("config init could not be completed with the following error: %v", err)
 			return
 		}
+
+
 	} else {
 		data, err := os.read_entire_file(config_file_name, context.temp_allocator)
 		if err != nil {
@@ -242,43 +260,24 @@ main :: proc() {
 
 	result: ma.result
 
-	if (config.has_custom_audio_file) {
-		custom_file_name := strings.join(
-			{"custom-audio-file", config.custom_audio_file_extension},
-			"",
-		)
+	custom_file_name := strings.join({"custom-audio-file", config.custom_audio_file_extension}, "")
 
-		path, err := filepath.join({config_dir_name, custom_file_name})
+	path, err := filepath.join({config_dir_name, custom_file_name})
 
-		if err != nil {
-			fmt.printfln("filepath could not be created with the following error")
-		}
-
-		cpath := strings.clone_to_cstring(path, context.temp_allocator)
-
-		result = ma.decoder_init_file(cpath, &dec_config, &decoder)
-
-	} else {
-		result = ma.decoder_init_memory(
-			raw_data(DEFAULT_SOUND_FILE),
-			len(DEFAULT_SOUND_FILE),
-			&dec_config,
-			&decoder,
-		)
+	if err != nil {
+		fmt.printfln("filepath could not be created with the following error")
 	}
 
-	if result == .SUCCESS {
-		ma.sound_init_from_data_source(&engine, decoder.ds.pCurrent, {}, nil, &sound)
-		ma.sound_set_looping(&sound, true)
-		ma.sound_start(&sound)
-	} else {
+	cpath := strings.clone_to_cstring(path, context.temp_allocator)
+
+	result = ma.sound_init_from_file(&engine, cpath, nil, nil, nil, &sound)
+	if result != .SUCCESS {
 		fmt.printfln(
-			"The audio was not able to be initialized with the following error: %v",
+			"The audio for the timer was not able to be initialized with the following error: %v",
 			result,
 		)
 		return
 	}
-
 
 	// sets the terminal apperance to raw and not cooked to turn off default echo behavior and treat it more like a game engine
 	enable_raw_mode()
@@ -290,32 +289,51 @@ main :: proc() {
 
 	clear_screen()
 
-	for d in 0 ..< 4 {
-		fmt.printf("--- %d ---\r\n", d)
-		for line in DIGITS[d] {
-			fmt.printf("|%s|\r\n", line) // pipes show exact width
-		}
-	}
+	// timer start here
+	// TODO: Update to use the parsed input from the cli params (10s, 10 seconds, 20m, 20min, 20 minutes, 10sec, 10, etc)
+	test_duration := 2 * time.Second
+	start := time.now()
+	last_second := -1
+	timer_is_running := true
 
-	buf: [1]byte
+	buf: [8]byte
 	for {
-		n, err := os.read(os.stdin, buf[:])
-		if n <= 0 do break
-		if err != nil {
-			fmt.print("You have encountered an error reading os.stdin.  ending the process. \r\n")
-			break
+		n, _ := os.read(os.stdin, buf[:])
+		if n > 0 {
+			c := buf[0]
+			if c == 'q' || c == 3 {
+				ma.sound_stop(&sound)
+				break
+			}
+
+
+			// ascii characters to type things out
+			if c >= 32 && c < 127 {
+				fmt.printf("%d, ('%c')\r\n", c, rune(c))
+			} else {
+				fmt.printf("%d\r\n", c)
+			}
 		}
 
-		c := buf[0]
-		if c == 'q' || c == 3 {
-			ma.sound_stop(&sound)
-			break
+		elapsed := time.diff(start, time.now())
+		remaining := test_duration - elapsed
+
+		if remaining <= 0 {
+			ma.sound_set_looping(&sound, true)
+			ma.sound_start(&sound)
+			timer_is_running = false
 		}
 
-		if c >= 32 && c < 127 {
-			fmt.printf("%d, ('%c')\r\n", c, rune(c))
-		} else {
-			fmt.printf("%d\r\n", c)
+		total_seconds := int(time.duration_seconds(remaining))
+		if total_seconds != last_second && timer_is_running {
+			last_second = total_seconds
+
+			hours := total_seconds / time.SECONDS_PER_HOUR
+			minutes := (total_seconds % time.SECONDS_PER_HOUR) / 60
+			seconds := total_seconds % time.SECONDS_PER_HOUR
+
+			// TODO: Render in a pretty way
+			fmt.printfln("hours: %d : minutes %d : seconds %d\r\n", hours, minutes, seconds)
 		}
 	}
 }
