@@ -10,34 +10,33 @@ import "core:time"
 
 import ma "vendor:miniaudio"
 
-// ============================================================================
-// Constants Start
-// ============================================================================
 CLEAR_SCREEN_CHAR :: "\x1b[2J"
 CONFIG_DIR :: "verdandi"
-// move cursor to home (top-left)
-CURSOR_HOME_CHAR :: "\x1b[H"
 
-DEFAULT_SOUND :: #load("./default-sound-effects/perfect.mp3")
-DEFAULT_SOUND_FILE :: "custom-audio-file.mp3"
+// ============================================================================
+// Terminal Cursor Options Start
+// ============================================================================
+// move cursor to home (top-left)
+MOVE_CURSOR_HOME_CHAR :: "\x1b[H"
 
 ENTER_ALT_SCREEN :: "\x1b[?1049h"
 LEAVE_ALT_SCREEN :: "\x1b[?1049l" // lowercase L
 
+HIDE_CURSOR_ON_SCREEN :: "\x1b[?25l"
+SHOW_CURSOR_ON_SCREEN :: "\x1b[?25h"
+// ============================================================================
+// Terminal Cursor Options End
+// ============================================================================
 
-// ============================================================================
-// Constants End
-// ============================================================================
+DEFAULT_SOUND :: #load("./default-sound-effects/perfect.mp3")
+DEFAULT_SOUND_FILE :: "custom-audio-file.mp3"
 
-// ============================================================================
-// Video Processing Start
-// ============================================================================
+CLOCK_CONTENT_WIDTH :: 36
+CLOCK_CONTENT_HEIGHT :: 6
+
 clear_screen :: proc() {
-	os.write_string(os.stdout, CLEAR_SCREEN_CHAR + CURSOR_HOME_CHAR)
+	os.write_string(os.stdout, CLEAR_SCREEN_CHAR + MOVE_CURSOR_HOME_CHAR)
 }
-// ============================================================================
-// Video Processing End
-// ============================================================================
 
 // ============================================================================
 // Audio Processing Code Start
@@ -120,7 +119,6 @@ validate_audio_file :: proc(path: string) -> (valid: bool, err: ma.result) {
 // ============================================================================
 // Parse Sound File End
 // ============================================================================
-
 
 main :: proc() {
 	// see if config directory exists
@@ -238,7 +236,6 @@ main :: proc() {
 			opts.custom_audio_file_path,
 		)
 
-
 		return
 	}
 
@@ -284,17 +281,23 @@ main :: proc() {
 	os.write_string(os.stdout, ENTER_ALT_SCREEN)
 	defer os.write_string(os.stdout, LEAVE_ALT_SCREEN)
 
+	os.write_string(os.stdout, HIDE_CURSOR_ON_SCREEN)
+	defer os.write_string(os.stdout, SHOW_CURSOR_ON_SCREEN)
+
 	clear_screen()
 
 	// timer start here
 	// TODO: Update to use the parsed input from the cli params (10s, 10 seconds, 20m, 20min, 20 minutes, 10sec, 10, etc)
-	test_duration := 2 * time.Second
+	//test_duration := 49 * time.Second
+	test_duration := 10 * time.Minute
 	start := time.now()
 	last_second := -1
 	timer_is_running := true
+	timer_is_paused := true
 
 	buf: [8]byte
 	for {
+		// handle keyboard motions: quit and pause
 		n, _ := os.read(os.stdin, buf[:])
 		if n > 0 {
 			c := buf[0]
@@ -302,19 +305,12 @@ main :: proc() {
 				ma.sound_stop(&sound)
 				break
 			}
-
-
-			// ascii characters to type things out
-			if c >= 32 && c < 127 {
-				fmt.printf("%d, ('%c')\r\n", c, rune(c))
-			} else {
-				fmt.printf("%d\r\n", c)
-			}
 		}
 
 		elapsed := time.diff(start, time.now())
 		remaining := test_duration - elapsed
 
+		// handle egg timer completion + play sound
 		if remaining <= 0 {
 			ma.sound_set_looping(&sound, true)
 			ma.sound_start(&sound)
@@ -322,15 +318,32 @@ main :: proc() {
 		}
 
 		total_seconds := int(time.duration_seconds(remaining))
+
 		if total_seconds != last_second && timer_is_running {
 			last_second = total_seconds
 
 			hours := total_seconds / time.SECONDS_PER_HOUR
 			minutes := (total_seconds % time.SECONDS_PER_HOUR) / 60
-			seconds := total_seconds % time.SECONDS_PER_HOUR
+			seconds := total_seconds % time.SECONDS_PER_MINUTE
 
-			// TODO: Render in a pretty way
-			fmt.printfln("hours: %d : minutes %d : seconds %d\r\n", hours, minutes, seconds)
+			d := [4]int{minutes / 10, minutes % 10, seconds / 10, seconds % 10}
+
+			term_width, term_height := get_terminal_size()
+
+			start_col := (term_width - CLOCK_CONTENT_WIDTH) / 2
+			start_row := (term_height - CLOCK_CONTENT_HEIGHT) / 2
+
+			clear_screen()
+
+			for line in 0 ..< 6 {
+				fmt.printf("\x1b[%d;%dH", start_row + line, start_col)
+
+				os.write_string(os.stdout, DIGITS[d[0]][line])
+				os.write_string(os.stdout, DIGITS[d[1]][line])
+				os.write_string(os.stdout, COLON[line])
+				os.write_string(os.stdout, DIGITS[d[2]][line])
+				os.write_string(os.stdout, DIGITS[d[3]][line])
+			}
 		}
 	}
 }

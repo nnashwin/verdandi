@@ -73,7 +73,7 @@ DIGITS := [10][6]string{
  "    |_| "},
 }
 
-COLON :: [6]string{
+COLON := [6]string{
 	"    ",
 	" _  ",
 	"(_) ",
