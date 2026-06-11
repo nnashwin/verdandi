@@ -5,6 +5,7 @@ import "core:flags"
 import "core:fmt"
 import "core:os"
 import "core:path/filepath"
+import "core:strconv"
 import "core:strings"
 import "core:time"
 
@@ -31,7 +32,7 @@ SHOW_CURSOR_ON_SCREEN :: "\x1b[?25h"
 DEFAULT_SOUND :: #load("./default-sound-effects/perfect.mp3")
 DEFAULT_SOUND_FILE :: "custom-audio-file.mp3"
 
-CLOCK_CONTENT_WIDTH :: 36
+CLOCK_CONTENT_WIDTH :: 54
 CLOCK_CONTENT_HEIGHT :: 6
 
 clear_screen :: proc() {
@@ -75,6 +76,88 @@ play_file :: proc(path: cstring) {
 
 Options :: struct {
 	custom_audio_file_path: string `args:"name=audio_file_path" usage:"sets custom audio file path"`,
+	time:                   string `args:"pos=0" usage:"Time unit (s, sec, seconds, m, min, minutes, h, hr, hours)"`,
+	overflow:               [dynamic]string,
+}
+
+DurationUnit :: enum {
+	Seconds,
+	Minutes,
+	Hours,
+}
+
+parse_unit :: proc(s: string) -> (DurationUnit, bool) {
+	switch strings.to_lower(s) {
+	case "s", "sec", "second", "seconds":
+		return DurationUnit.Seconds, true
+
+	case "m", "min", "minute", "minutes":
+		return DurationUnit.Minutes, true
+	case "h", "hr", "hrs", "hour", "hours":
+		return DurationUnit.Hours, true
+	}
+
+	return .Seconds, false
+}
+
+to_duration :: proc(value: f64, unit: DurationUnit) -> time.Duration {
+	ns: f64
+	switch unit {
+	case DurationUnit.Seconds:
+		ns = value * f64(time.Second)
+	case DurationUnit.Minutes:
+		ns = value * f64(time.Minute)
+	case DurationUnit.Hours:
+		ns = value * f64(time.Hour)
+	}
+
+	return time.Duration(ns)
+}
+
+parse_combined :: proc(duration_str: string) -> (f64, DurationUnit, bool) {
+	split := 0
+	for i := 0; i < len(duration_str); i += 1 {
+		if duration_str[i] >= '0' && duration_str[i] <= '9' || duration_str[i] == '.' {
+			split += 1
+		} else {
+			// we have started to hit the actual unit string (second, minute, or hour)
+			break
+		}
+	}
+
+	if split == 0 || split == len(duration_str) {
+		return 0, DurationUnit.Seconds, false
+	}
+
+	value, val_ok := strconv.parse_f64(duration_str[:split])
+	if !val_ok {return 0, DurationUnit.Seconds, false}
+
+	unit, unit_ok := parse_unit(duration_str[split:])
+	if !unit_ok {return 0, DurationUnit.Seconds, false}
+
+	return value, unit, true
+}
+
+parse_duration :: proc(raw: string, overflow: []string) -> (time.Duration, bool) {
+	if len(overflow) == 1 {
+
+		value, val_ok := strconv.parse_f64(raw)
+		if !val_ok do return 0, false
+
+		unit, unit_ok := parse_unit(overflow[0])
+		if !unit_ok do return 0, false
+
+		return to_duration(value, unit), true
+	}
+
+	if len(overflow) == 0 {
+		value, unit, ok := parse_combined(raw)
+
+		if !ok do return 0, false
+		return to_duration(value, unit), true
+	}
+
+	return 0, false
 }
 
 // ============================================================================
@@ -119,7 +202,6 @@ validate_audio_file :: proc(path: string) -> (valid: bool, err: ma.result) {
 // ============================================================================
 // Parse Sound File End
 // ============================================================================
-
 main :: proc() {
 	// see if config directory exists
 	config_dir_name := get_config_dir()
@@ -239,6 +321,14 @@ main :: proc() {
 		return
 	}
 
+	// parse duration and handle errors
+	parsed_duration, duration_is_ok := parse_duration(opts.time, opts.overflow[:])
+	if !duration_is_ok {
+		fmt.printfln(
+			"the duration you entered is invalid.  please re-enter the time duration and try again",
+		)
+	}
+
 
 	// initialize audio
 	audio_result := init_audio()
@@ -284,12 +374,12 @@ main :: proc() {
 	os.write_string(os.stdout, HIDE_CURSOR_ON_SCREEN)
 	defer os.write_string(os.stdout, SHOW_CURSOR_ON_SCREEN)
 
+
 	clear_screen()
 
 	// timer start here
 	// TODO: Update to use the parsed input from the cli params (10s, 10 seconds, 20m, 20min, 20 minutes, 10sec, 10, etc)
-	//test_duration := 49 * time.Second
-	test_duration := 10 * time.Minute
+
 	start := time.now()
 	last_second := -1
 	timer_is_running := true
@@ -308,7 +398,7 @@ main :: proc() {
 		}
 
 		elapsed := time.diff(start, time.now())
-		remaining := test_duration - elapsed
+		remaining := parsed_duration - elapsed
 
 		// handle egg timer completion + play sound
 		if remaining <= 0 {
@@ -326,7 +416,14 @@ main :: proc() {
 			minutes := (total_seconds % time.SECONDS_PER_HOUR) / 60
 			seconds := total_seconds % time.SECONDS_PER_MINUTE
 
-			d := [4]int{minutes / 10, minutes % 10, seconds / 10, seconds % 10}
+			d := [6]int {
+				hours / 10,
+				hours % 10,
+				minutes / 10,
+				minutes % 10,
+				seconds / 10,
+				seconds % 10,
+			}
 
 			term_width, term_height := get_terminal_size()
 
@@ -343,6 +440,9 @@ main :: proc() {
 				os.write_string(os.stdout, COLON[line])
 				os.write_string(os.stdout, DIGITS[d[2]][line])
 				os.write_string(os.stdout, DIGITS[d[3]][line])
+				os.write_string(os.stdout, COLON[line])
+				os.write_string(os.stdout, DIGITS[d[4]][line])
+				os.write_string(os.stdout, DIGITS[d[5]][line])
 			}
 		}
 	}
