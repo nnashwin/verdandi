@@ -1,0 +1,10 @@
+* TODOS
+** IN-PROGRESS Finish out gif to grayscale to braille render logic that can handle terminal resizes
+** TODO Flesh out cross-platform build so that it is easy to work on and compile the project with the foreign import for gifdec
+** TODO Ensure that --help dialogue has all resources necessary
+** TODO Write out basic readme that enables people to use and contribute
+** TODO Post about it on x.com
+
+* Stretch / Future Goals
+** TODO Add logic to allow users to import their own success gifs to use once the timer is over
+** TODO Add pause button

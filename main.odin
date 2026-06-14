@@ -29,7 +29,9 @@ SHOW_CURSOR_ON_SCREEN :: "\x1b[?25h"
 // Terminal Cursor Options End
 // ============================================================================
 
-DEFAULT_SOUND :: #load("./default-sound-effects/perfect.mp3")
+DEFAULT_GIF :: #load("./assets/zangief-yes-gif.gif")
+
+DEFAULT_SOUND :: #load("./assets/default-sound-effects/perfect.mp3")
 DEFAULT_SOUND_FILE :: "custom-audio-file.mp3"
 
 CLOCK_CONTENT_WIDTH :: 54
@@ -47,7 +49,7 @@ dec_config: ma.decoder_config
 engine: ma.engine
 sound: ma.sound
 
-init_audio :: proc() -> ma.result {
+init_audio_engine :: proc() -> ma.result {
 	config := ma.engine_config_init()
 	init_result := ma.engine_init(&config, &engine)
 	if init_result != .SUCCESS do return init_result
@@ -202,6 +204,8 @@ validate_audio_file :: proc(path: string) -> (valid: bool, err: ma.result) {
 // ============================================================================
 // Parse Sound File End
 // ============================================================================
+
+
 main :: proc() {
 	// see if config directory exists
 	config_dir_name := get_config_dir()
@@ -329,9 +333,7 @@ main :: proc() {
 		)
 	}
 
-
-	// initialize audio
-	audio_result := init_audio()
+	audio_result := init_audio_engine()
 	if audio_result != .SUCCESS {
 		fmt.printfln(
 			"audio could not init for your device for the following reason: %v.  Please resolve and try again",
@@ -343,9 +345,7 @@ main :: proc() {
 	defer cleanup_audio()
 
 	result: ma.result
-
 	custom_file_name := strings.join({"custom-audio-file", config.custom_audio_file_extension}, "")
-
 	path, err := filepath.join({config_dir_name, custom_file_name})
 
 	if err != nil {
@@ -362,6 +362,14 @@ main :: proc() {
 		)
 		return
 	}
+
+	anim, ok := load_gif_from_bytes(DEFAULT_GIF)
+	if !ok {
+		fmt.eprintln("Failed to load custom GIF")
+		return
+	}
+	defer destroy_animation(&anim)
+
 
 	// sets the terminal apperance to raw and not cooked to turn off default echo behavior and treat it more like a game engine
 	enable_raw_mode()
@@ -382,8 +390,8 @@ main :: proc() {
 
 	start := time.now()
 	last_second := -1
-	timer_is_running := true
-	timer_is_paused := true
+	timer_is_paused := false
+	timer_has_finished := false
 
 	buf: [8]byte
 	for {
@@ -401,15 +409,15 @@ main :: proc() {
 		remaining := parsed_duration - elapsed
 
 		// handle egg timer completion + play sound
-		if remaining <= 0 {
+		if !timer_is_paused && remaining <= 0 {
 			ma.sound_set_looping(&sound, true)
 			ma.sound_start(&sound)
-			timer_is_running = false
+			timer_has_finished = true
 		}
 
 		total_seconds := int(time.duration_seconds(remaining))
 
-		if total_seconds != last_second && timer_is_running {
+		if total_seconds != last_second && !timer_has_finished {
 			last_second = total_seconds
 
 			hours := total_seconds / time.SECONDS_PER_HOUR
@@ -444,6 +452,10 @@ main :: proc() {
 				os.write_string(os.stdout, DIGITS[d[4]][line])
 				os.write_string(os.stdout, DIGITS[d[5]][line])
 			}
+		}
+
+		if (!timer_is_paused && timer_has_finished) {
+
 		}
 	}
 }
