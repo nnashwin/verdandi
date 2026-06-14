@@ -8,6 +8,7 @@ import "core:path/filepath"
 import "core:strconv"
 import "core:strings"
 import "core:time"
+import "core:unicode/utf8"
 
 import ma "vendor:miniaudio"
 
@@ -206,6 +207,18 @@ validate_audio_file :: proc(path: string) -> (valid: bool, err: ma.result) {
 // ============================================================================
 
 
+AppState :: struct {
+	// gif-specific
+	gif_frame_index:     int,
+	gif_last_frame_time: time.Time,
+	gif_playing:         bool,
+	// git-specific end
+	last_second:         int,
+	timer_has_finished:  bool,
+	timer_is_paused:     bool,
+	timer_start:         time.Time,
+}
+
 main :: proc() {
 	// see if config directory exists
 	config_dir_name := get_config_dir()
@@ -388,10 +401,11 @@ main :: proc() {
 	// timer start here
 	// TODO: Update to use the parsed input from the cli params (10s, 10 seconds, 20m, 20min, 20 minutes, 10sec, 10, etc)
 
-	start := time.now()
-	last_second := -1
-	timer_is_paused := false
-	timer_has_finished := false
+	state: AppState
+	state.timer_start = time.now()
+	state.last_second = -1
+	state.timer_is_paused = false
+	state.timer_has_finished = false
 
 	buf: [8]byte
 	for {
@@ -405,20 +419,20 @@ main :: proc() {
 			}
 		}
 
-		elapsed := time.diff(start, time.now())
+		elapsed := time.diff(state.timer_start, time.now())
 		remaining := parsed_duration - elapsed
 
 		// handle egg timer completion + play sound
-		if !timer_is_paused && remaining <= 0 {
+		if !state.timer_is_paused && remaining <= 0 {
 			ma.sound_set_looping(&sound, true)
 			ma.sound_start(&sound)
-			timer_has_finished = true
+			state.timer_has_finished = true
 		}
 
 		total_seconds := int(time.duration_seconds(remaining))
 
-		if total_seconds != last_second && !timer_has_finished {
-			last_second = total_seconds
+		if total_seconds != state.last_second && !state.timer_has_finished {
+			state.last_second = total_seconds
 
 			hours := total_seconds / time.SECONDS_PER_HOUR
 			minutes := (total_seconds % time.SECONDS_PER_HOUR) / 60
@@ -454,8 +468,64 @@ main :: proc() {
 			}
 		}
 
-		if (!timer_is_paused && timer_has_finished) {
+		// play ending braille animation
+		if (!state.timer_is_paused && state.timer_has_finished) {
+			now := time.now()
 
+			// init gif state
+			if !state.gif_playing {
+				state.gif_playing = true
+				state.gif_frame_index = 0
+				state.gif_last_frame_time = now
+				clear_screen()
+			}
+
+			elapsed := time.duration_milliseconds(time.diff(state.gif_last_frame_time, now))
+
+			if elapsed >= f64(anim.delays[state.gif_frame_index]) {
+
+				cols := 60
+				src_aspect := f64(anim.height) / f64(anim.width)
+				rows := int(f64(cols) * src_aspect * 0.5) // 0.5 because braille is 2 wide and 4 tall
+				threshold: u8 = 128
+
+				term_height, term_width := get_terminal_size()
+
+				s := grayscale_to_braille(
+					anim.pixels[state.gif_frame_index],
+					anim.width,
+					anim.height,
+					cols,
+					rows,
+					threshold,
+				)
+
+				clear_screen()
+
+				lines := strings.split(s, "\n")
+				defer delete(lines)
+
+				line_count := len(lines)
+				if line_count > 0 && len(lines[line_count - 1]) == 0 {
+					line_count -= 1
+				}
+
+				pad_top := max((term_height - line_count) / 2, 0)
+
+				fmt.printf("\x1b[%d;1H", pad_top + 1)
+
+				for i in 0 ..< line_count {
+					rune_len := utf8.rune_count_in_string(lines[i])
+					pad_left := max((term_width - rune_len) / 2, 0)
+
+					fmt.printf("\x1b[2K\x1b[%dC%s\n", pad_left, lines[i])
+				}
+				delete(s)
+
+				// reset each frame of the animation in order to see whether or not the terminal has been resized
+				state.gif_frame_index = (state.gif_frame_index + 1) % anim.frame_count
+				state.gif_last_frame_time = now
+			}
 		}
 	}
 }

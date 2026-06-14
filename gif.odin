@@ -109,7 +109,7 @@ grayscale_to_braille :: proc(
 				sy := (by + dy) * src_h / th
 
 				if sx < src_w && sy < src_h {
-					if src[sy * src_h + sx] < threshold {
+					if src[sy * src_w + sx] < threshold {
 						dots |= u32(bit)
 					}
 				}
