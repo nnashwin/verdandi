@@ -483,13 +483,26 @@ main :: proc() {
 			elapsed := time.duration_milliseconds(time.diff(state.gif_last_frame_time, now))
 
 			if elapsed >= f64(anim.delays[state.gif_frame_index]) {
+				term_width, term_height := get_terminal_size()
 
-				cols := 60
+				max_cols := term_width - 4
+				max_rows := term_height - 2
+
+
 				src_aspect := f64(anim.height) / f64(anim.width)
-				rows := int(f64(cols) * src_aspect * 0.5) // 0.5 because braille is 2 wide and 4 tall
-				threshold: u8 = 128
+				cell_aspect := 0.5 // braille cell: 2 dots wide, 4 tall
 
-				term_height, term_width := get_terminal_size()
+				// Fit to width first
+				cols := max_cols
+				rows := int(f64(cols) * src_aspect * cell_aspect)
+
+				// If that overflows height, constrain by height instead
+				if rows > max_rows {
+					rows = max_rows
+					cols = int(f64(rows) / src_aspect / cell_aspect)
+				}
+
+				threshold: u8 = 128
 
 				s := grayscale_to_braille(
 					anim.pixels[state.gif_frame_index],
@@ -511,18 +524,15 @@ main :: proc() {
 				}
 
 				pad_top := max((term_height - line_count) / 2, 0)
-
-				fmt.printf("\x1b[%d;1H", pad_top + 1)
-
 				for i in 0 ..< line_count {
 					rune_len := utf8.rune_count_in_string(lines[i])
 					pad_left := max((term_width - rune_len) / 2, 0)
-
-					fmt.printf("\x1b[2K\x1b[%dC%s\n", pad_left, lines[i])
+					// Use pad_top + i for the row, not a hardcoded 0
+					fmt.printf("\x1b[%d;%dH%s", pad_top + 1 + i, pad_left + 1, lines[i])
 				}
+
 				delete(s)
 
-				// reset each frame of the animation in order to see whether or not the terminal has been resized
 				state.gif_frame_index = (state.gif_frame_index + 1) % anim.frame_count
 				state.gif_last_frame_time = now
 			}

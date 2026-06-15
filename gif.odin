@@ -99,25 +99,43 @@ grayscale_to_braille :: proc(
 	for row in 0 ..< target_rows {
 		for col in 0 ..< target_cols {
 			dots: u32 = 0x2800
-
 			bx := col * 2
 			by := row * 4
 
 			for off in OFFSETS {
 				dx, dy, bit := off[0], off[1], off[2]
-				sx := (bx + dx) * src_w / tw
-				sy := (by + dy) * src_h / th
+				tx := bx + dx
+				ty := by + dy
 
-				if sx < src_w && sy < src_h {
-					if src[sy * src_w + sx] < threshold {
-						dots |= u32(bit)
+				// Source region this single dot covers
+				sx0 := tx * src_w / tw
+				sx1 := (tx + 1) * src_w / tw
+				sy0 := ty * src_h / th
+				sy1 := (ty + 1) * src_h / th
+				if sx1 <= sx0 do sx1 = sx0 + 1
+				if sy1 <= sy0 do sy1 = sy0 + 1
+
+				sum := 0
+				count := 0
+				for yy in sy0 ..< sy1 {
+					for xx in sx0 ..< sx1 {
+						if xx < src_w && yy < src_h {
+							sum += int(src[yy * src_w + xx])
+							count += 1
+						}
 					}
 				}
+
+				avg := u8(sum / max(count, 1))
+				if avg < threshold {
+					dots |= u32(bit)
+				}
 			}
+
 			b, w := utf8.encode_rune(rune(dots))
 			append(&buf, ..b[:w])
 		}
-
+		append(&buf, '\n')
 	}
 
 	return string(buf[:])
