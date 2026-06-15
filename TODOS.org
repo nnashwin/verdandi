@@ -1,7 +1,8 @@
 * TODOS
 ** DONE Finish out gif to grayscale to braille render logic that can handle terminal resizes
    CLOSED: [2026-06-14 Sun 12:29]
-** TODO Implement contrast / sharpening of the image with adding an external stb_image_resize2 dependency and testing this out
+** DONE Implement contrast / sharpening of the image with adding an external stb_image_resize2 dependency and testing this out
+   CLOSED: [2026-06-15 Mon 09:31]
 ** TODO Flesh out cross-platform build so that it is easy to work on and compile the project with the foreign import for gifdec
 ** TODO Ensure that --help dialogue has all resources necessary
 ** TODO Write out basic readme that enables people to use and contribute
