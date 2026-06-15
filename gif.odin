@@ -1,7 +1,6 @@
 package main
 
 import "core:c"
-import "core:fmt"
 import "core:os"
 import "core:unicode/utf8"
 import gd "gifdec"
@@ -18,8 +17,6 @@ Animation :: struct {
 }
 
 apply_floyd_steinberg :: proc(pixels: []u8, w, h: int, threshold: u8) {
-	fmt.printf("dither: len(pixels)=%d w=%d h=%d w*h=%d\n", len(pixels), w, h, w * h)
-	assert(len(pixels) == w * h)
 	// work in signed space to carry error
 	buf := make([]f64, len(pixels))
 	defer delete(buf)
