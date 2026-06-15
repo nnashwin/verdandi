@@ -1,8 +1,13 @@
 package main
 
+import "core:c"
+import "core:fmt"
 import "core:os"
 import "core:unicode/utf8"
 import gd "gifdec"
+import stb_resize "stb_resize"
+
+DITHERING_THRESHOLD_OFFSET :: 20
 
 Animation :: struct {
 	width:       int,
@@ -10,6 +15,83 @@ Animation :: struct {
 	frame_count: int,
 	delays:      []u32,
 	pixels:      [][]u8, // [frame][width * height] grayscale
+}
+
+apply_floyd_steinberg :: proc(pixels: []u8, w, h: int, threshold: u8) {
+	fmt.printf("dither: len(pixels)=%d w=%d h=%d w*h=%d\n", len(pixels), w, h, w * h)
+	assert(len(pixels) == w * h)
+	// work in signed space to carry error
+	buf := make([]f64, len(pixels))
+	defer delete(buf)
+	for i in 0 ..< len(pixels) do buf[i] = f64(pixels[i])
+
+	size := w + h
+
+	for y in 0 ..< h {
+		for x in 0 ..< w {
+			idx := y * w + x
+			old := buf[idx]
+			new := f64(255) if old >= f64(threshold) else 0
+
+			buf[idx] = new
+			err := old - new
+
+			// distribute error to neighbors
+			if x + 1 < w && idx + 1 < size do buf[idx + 1] += err * 7.0 / 16.0
+			if y + 1 < h {
+				if x > 0 && idx + w - 1 < size {
+					buf[idx + w - 1] += err * 3.0 / 16.0
+				}
+				if idx + w < size {
+					buf[idx + w] = err * 5.0 / 16.0
+				}
+				if x + 1 < w && idx + w + 1 < size {
+					buf[idx + w + 1] += err * 1.0 / 16.0
+				}
+			}
+		}
+	}
+
+	for i in 0 ..< len(pixels) do pixels[i] = u8(clamp(buf[i], 0, 255))
+}
+
+compute_otsu_threshold :: proc(pixels: []u8) -> u8 {
+	hist: [256]int
+	for p in pixels do hist[p] += 1
+
+	total := len(pixels)
+	sum: f64 = 0
+	for i in 0 ..< 256 do sum += f64(i) * f64(hist[i])
+
+	sum_bg: f64 = 0
+	weight_bg := 0
+	weight_fg := 0
+
+	max_variance: f64 = 0
+	best_threshold: u8 = 128
+
+	for t in 0 ..< 256 {
+		weight_bg += hist[t]
+		if weight_bg == 0 do continue
+
+		weight_fg = total - weight_bg
+		if weight_fg == 0 do break
+
+		sum_bg += f64(t) * f64(hist[t])
+		mean_bg := sum_bg / f64(weight_bg)
+		mean_fg := (sum - sum_bg) / f64(weight_fg)
+
+		diff := mean_fg - mean_bg
+		variance := f64(weight_bg) * f64(weight_fg) * diff * diff
+
+		if variance > max_variance {
+			max_variance = variance
+			best_threshold = u8(t)
+		}
+
+	}
+
+	return best_threshold
 }
 
 load_gif_from_bytes :: proc(data: []u8) -> (anim: Animation, ok: bool) {
@@ -80,8 +162,31 @@ grayscale_to_braille :: proc(
 	target_cols, target_rows: int,
 	threshold: u8,
 ) -> string {
+
+
 	tw := target_cols * 2
 	th := target_rows * 4
+
+	resized := make([]u8, tw * th)
+	defer delete(resized)
+
+	stb_resize.resize_uint8_linear(
+		raw_data(src),
+		c.int(src_w),
+		c.int(src_h),
+		0,
+		raw_data(resized),
+		c.int(tw),
+		c.int(th),
+		0,
+		1,
+	)
+
+	// choose threshold to calculate
+	threshold := compute_otsu_threshold(resized) - DITHERING_THRESHOLD_OFFSET
+
+	// dither using the adaptive threshold in order to provide correct contrast gradient (not flat)
+	apply_floyd_steinberg(resized, tw, th, threshold)
 
 	buf := make([dynamic]u8, 0, target_cols * target_rows * 4 + target_rows)
 
@@ -104,30 +209,10 @@ grayscale_to_braille :: proc(
 
 			for off in OFFSETS {
 				dx, dy, bit := off[0], off[1], off[2]
-				tx := bx + dx
-				ty := by + dy
+				px := bx + dx
+				py := by + dy
 
-				// Source region this single dot covers
-				sx0 := tx * src_w / tw
-				sx1 := (tx + 1) * src_w / tw
-				sy0 := ty * src_h / th
-				sy1 := (ty + 1) * src_h / th
-				if sx1 <= sx0 do sx1 = sx0 + 1
-				if sy1 <= sy0 do sy1 = sy0 + 1
-
-				sum := 0
-				count := 0
-				for yy in sy0 ..< sy1 {
-					for xx in sx0 ..< sx1 {
-						if xx < src_w && yy < src_h {
-							sum += int(src[yy * src_w + xx])
-							count += 1
-						}
-					}
-				}
-
-				avg := u8(sum / max(count, 1))
-				if avg < threshold {
+				if resized[py * tw + px] == 0 {
 					dots |= u32(bit)
 				}
 			}
