@@ -78,9 +78,11 @@ play_file :: proc(path: cstring) {
 // ============================================================================
 
 Options :: struct {
-	custom_audio_file_path: string `args:"name=audio_file_path" usage:"sets custom audio file path"`,
-	time:                   string `args:"pos=0" usage:"Time unit (s, sec, seconds, m, min, minutes, h, hr, hours)"`,
-	overflow:               [dynamic]string,
+	time:                   string `args:"pos=0,required" usage:"Duration amount. Combine with unit ('10s', '5m', '1h') or pass unit as next arg ('10 sec')."`,
+	custom_audio_file_path: string `args:"name=audio_file_path" usage:"Path to a custom audio file (.mp3, .wav). Copies it into the config dir as the
+  chime."`,
+	overflow:               [dynamic]string `usage:"Optional unit when separated from amount (e.g. 'verdandi 10 sec'). Accepts: s|sec|seconds, m|min|minutes,
+  h|hr|hours."`,
 }
 
 DurationUnit :: enum {
@@ -279,6 +281,23 @@ main :: proc() {
 
 	// parse cli flags
 	opts: Options
+
+	// intercept arg before we parse options
+	for arg in os.args[1:] {
+		if arg == "-h" || arg == "--help" || arg == "help" {
+			fmt.println("verdandi — a terminal work timer with a chime")
+			fmt.println()
+			fmt.println("Examples:")
+			fmt.println("  verdandi 25m                    # 25-minute timer")
+			fmt.println("  verdandi 10 sec                 # split form")
+			fmt.println("  verdandi --audio_file_path=bell.mp3   # set custom chime")
+			fmt.println()
+			// fall through to flags.parse_or_exit so it prints the flag table
+			break
+		}
+	}
+	flags.parse_or_exit(&opts, os.args, .Unix)
+
 
 	flags.parse_or_exit(&opts, os.args, .Unix)
 
