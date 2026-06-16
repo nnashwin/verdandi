@@ -145,7 +145,6 @@ parse_combined :: proc(duration_str: string) -> (f64, DurationUnit, bool) {
 
 parse_duration :: proc(raw: string, overflow: []string) -> (time.Duration, bool) {
 	if len(overflow) == 1 {
-
 		value, val_ok := strconv.parse_f64(raw)
 		if !val_ok do return 0, false
 
@@ -296,9 +295,6 @@ main :: proc() {
 			break
 		}
 	}
-	flags.parse_or_exit(&opts, os.args, .Unix)
-
-
 	flags.parse_or_exit(&opts, os.args, .Unix)
 
 	if opts.custom_audio_file_path != "" {
