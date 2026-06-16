@@ -1,3 +1,4 @@
+#+build windows
 package main
 
 import win32 "core:sys/windows"
@@ -7,7 +8,7 @@ import win32 "core:sys/windows"
 
 enable_raw_mode :: proc() {
     hin := win32.GetStdHandle(win32.STD_INPUT_HANDLE)
-    hout := win32.GetStdHandle(win32.STD_INPUT_HANDLE)
+    hout := win32.GetStdHandle(win32.STD_OUTPUT_HANDLE)
 
     win32.GetConsoleMode(hin, &orig_in_mode)
     win32.GetConsoleMode(hout, &orig_out_mode)

@@ -2,6 +2,8 @@ package main
 
 import "core:c"
 import "core:os"
+import "core:path/filepath"
+import "core:strings"
 import "core:unicode/utf8"
 import gd "gifdec"
 import stb_resize "stb_resize"
@@ -92,7 +94,18 @@ compute_otsu_threshold :: proc(pixels: []u8) -> u8 {
 }
 
 load_gif_from_bytes :: proc(data: []u8) -> (anim: Animation, ok: bool) {
-	tmp_path :: "/tmp/_embedded_gif.gif"
+	tmp_dir_path, tmp_dir_err := os.temp_dir(context.temp_allocator)
+	if tmp_dir_err != nil {
+		return Animation{}, false
+	}
+
+	tmp_path, join_err := filepath.join(
+		{tmp_dir_path, "_embedded_gif.gif"},
+		context.temp_allocator,
+	)
+	if join_err != nil {
+		return Animation{}, false
+	}
 
 	err := os.write_entire_file(tmp_path, data)
 	if err != nil {
@@ -101,7 +114,8 @@ load_gif_from_bytes :: proc(data: []u8) -> (anim: Animation, ok: bool) {
 
 	defer os.remove(tmp_path)
 
-	return load_gif(tmp_path)
+	cpath := strings.clone_to_cstring(tmp_path, context.temp_allocator)
+	return load_gif(cpath)
 }
 
 
