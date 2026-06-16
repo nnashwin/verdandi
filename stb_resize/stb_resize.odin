@@ -2,7 +2,12 @@ package stb_resize
 
 import "core:c"
 
-foreign import lib "../vendor/stb_image_resize2/libstb_resize.a"
+when ODIN_OS == .Windows {
+	foreign import lib "../vendor/stb_image_resize2/libstb_resize.lib"
+} else {
+	foreign import lib "../vendor/stb_image_resize2/libstb_resize.a"
+}
+
 
 Filter :: enum c.int {
 	DEFAULT    = 0,

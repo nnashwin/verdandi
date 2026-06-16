@@ -26,9 +26,12 @@ GD_GIF :: struct {
 	frame:      [^]c.uint8_t,
 }
 
-when ODIN_OS == .Linux || ODIN_OS == .Darwin {
+when ODIN_OS == .Windows {
+	foreign import lib "../vendor/gifdec/gifdec.lib"
+} else {
 	foreign import lib "../vendor/gifdec/libgifdec.a"
 }
+
 
 foreign lib {
 	gd_open_gif :: proc(path: cstring) -> ^GD_GIF ---
