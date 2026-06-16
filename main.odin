@@ -32,7 +32,7 @@ SHOW_CURSOR_ON_SCREEN :: "\x1b[?25h"
 
 DEFAULT_GIF :: #load("./assets/zangief-yes-gif.gif")
 
-DEFAULT_SOUND :: #load("./assets/default-sound-effects/perfect.mp3")
+DEFAULT_SOUND :: #load("./assets/default-sound-effects/zangief-laugh.mp3")
 DEFAULT_SOUND_FILE :: "custom-audio-file.mp3"
 
 CLOCK_CONTENT_WIDTH :: 54
