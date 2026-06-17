@@ -42,6 +42,23 @@ jobs:
           sudo apt-get install -y make gcc
           make -C "$(odin root)/vendor/miniaudio/src"
 
+      - name: Build vendor libraries (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          make -C "$(odin root)/vendor/miniaudio/src"
+
+      - name: Build vendor (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          for /f "tokens=*" %%i in ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath') do set VS=%%i
+          call "!VS!\VC\Auxiliary\Build\vcvarsall.bat" amd64
+          pushd "%ODIN_ROOT%\vendor\miniaudio\src"
+          call build.bat
+          popd
+
+
+
       - name: Build
         shell: bash
         run: odin build . -o:speed -out:${{ matrix.artifact }}
