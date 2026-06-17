@@ -37,6 +37,10 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           release: latest
 
+      - name: Setup MSVC
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Build gifdec (Linux / macOS)
         if: runner.os != 'Windows'
         shell: bash
@@ -70,8 +74,6 @@ jobs:
         if: runner.os == 'Windows'
         shell: cmd
         run: |
-          for /f "tokens=*" %%i in ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath') do set VS=%%i
-          call "!VS!\VC\Auxiliary\Build\vcvarsall.bat" amd64
           pushd "%ODIN_ROOT%\vendor\miniaudio\src"
           call build.bat
           popd
@@ -87,12 +89,10 @@ jobs:
           cc -c -O2 -fPIC stb_resize_impl.c -o stb_resize.o
           ar rcs libstb_resize.a stb_resize.o
 
-      - name: Build gifdec (Windows)
+      - name: Build external vendor apps (Windows)
         if: runner.os == 'Windows'
         shell: cmd
         run: |
-          for /f "tokens=*" %%i in ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath') do set VS=%%i
-          call "!VS!\VC\Auxiliary\Build\vcvarsall.bat" amd64
           cd vendor\gifdec
           cl /c /O2 gifdec.c
           lib /OUT:gifdec.lib gifdec.obj
