@@ -83,7 +83,7 @@ jobs:
           cc -c -O2 -fPIC gifdec.c -o gifdec.o
           ar rcs libgifdec.a gifdec.o
           cd ../stb_image_resize2
-          cc -c -O2 -fPIC stb_resize.c -o stb_resize.o
+          cc -c -O2 -fPIC stb_resize_impl.c -o stb_resize.o
           ar rcs libstb_resize.a stb_resize.o
 
       - name: Build gifdec (Windows)
