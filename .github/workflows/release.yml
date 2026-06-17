@@ -91,13 +91,13 @@ jobs:
         shell: cmd
         run: |
           for /f "tokens=*" %%i in ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath') do set VS=%%i
-        call "!VS!\VC\Auxiliary\Build\vcvarsall.bat" amd64
-        cd vendor\gifdec
-        cl /c /O2 gifdec.c
-        lib /OUT:gifdec.lib gifdec.obj
-        cd ..\stb_image_resize2
-        cl /c /O2 stb_resize.c
-        lib /OUT:libstb_resize.lib stb_resize.obj
+          call "!VS!\VC\Auxiliary\Build\vcvarsall.bat" amd64
+          cd vendor\gifdec
+          cl /c /O2 gifdec.c
+          lib /OUT:gifdec.lib gifdec.obj
+          cd ..\stb_image_resize2
+          cl /c /O2 stb_resize.c
+          lib /OUT:libstb_resize.lib stb_resize.obj
 
       - name: Build
         shell: bash
