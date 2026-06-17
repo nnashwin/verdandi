@@ -34,9 +34,9 @@ disable_raw_mode :: proc() {
 }
 
 get_terminal_size :: proc() -> (int, int) {
-	handle := windows.GetStdHandle(windows.STD_OUTPUT_HANDLE)
-	info: windows.CONSOLE_SCREEN_BUFFER_INFO
-	if windows.GetConsoleScreenBufferInfo(handle, &info) {
+	handle := win32.GetStdHandle(win32.STD_OUTPUT_HANDLE)
+	info: win32.CONSOLE_SCREEN_BUFFER_INFO
+	if win32.GetConsoleScreenBufferInfo(handle, &info) {
 		width := int(info.srWindow.Right - info.srWindow.Left + 1)
 		height := int(info.srWindow.Bottom - info.srWindow.Top + 1)
 		return width, height
