@@ -36,18 +36,36 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           release: latest
 
-      - name: Build vendor libraries (Linux)
+      - name: Build gifdec (Linux / macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cd vendor/gifdec
+          cc -c -O2 -fPIC gifdec.c -o gifdec.o
+          ar rcs libgifdec.a gifdec.o
+
+      - name: Build gifdec (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          for /f "tokens=*" %%i in ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath') do set VS=%%i
+          call "!VS!\VC\Auxiliary\Build\vcvarsall.bat" amd64
+          cd vendor\gifdec
+          cl /c /O2 gifdec.c
+          lib /OUT:gifdec.lib gifdec.obj
+
+      - name: Build miniaudio libraries (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get install -y make gcc
           make -C "$(odin root)/vendor/miniaudio/src"
 
-      - name: Build vendor libraries (macOS)
+      - name: Build miniaudio libraries (macOS)
         if: runner.os == 'macOS'
         run: |
           make -C "$(odin root)/vendor/miniaudio/src"
 
-      - name: Build vendor (Windows)
+      - name: Build miniaudio (Windows)
         if: runner.os == 'Windows'
         shell: cmd
         run: |
@@ -56,8 +74,6 @@ jobs:
           pushd "%ODIN_ROOT%\vendor\miniaudio\src"
           call build.bat
           popd
-
-
 
       - name: Build
         shell: bash
