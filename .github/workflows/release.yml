@@ -75,6 +75,30 @@ jobs:
           call build.bat
           popd
 
+      - name: Build external vendor applications (Linux / macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cd vendor/gifdec
+          cc -c -O2 -fPIC gifdec.c -o gifdec.o
+          ar rcs libgifdec.a gifdec.o
+          cd ../stb_image_resize2
+          cc -c -O2 -fPIC stb_resize.c -o stb_resize.o
+          ar rcs libstb_resize.a stb_resize.o
+
+      - name: Build gifdec (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          for /f "tokens=*" %%i in ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath') do set VS=%%i
+        call "!VS!\VC\Auxiliary\Build\vcvarsall.bat" amd64
+        cd vendor\gifdec
+        cl /c /O2 gifdec.c
+        lib /OUT:gifdec.lib gifdec.obj
+        cd ..\stb_image_resize2
+        cl /c /O2 stb_resize.c
+        lib /OUT:libstb_resize.lib stb_resize.obj
+
       - name: Build
         shell: bash
         run: odin build . -o:speed -out:${{ matrix.artifact }}
