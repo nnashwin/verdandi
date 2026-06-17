@@ -9,6 +9,8 @@
 ** DONE Ensure that --help dialogue has all resources necessary
    CLOSED: [2026-06-15 Mon 21:49]
 ** IN-PROGRESS Write out basic readme that enables people to use and contribute
+** TODO Create GIF to show how the timer works and add it to the readme
+** TODO Add github actions to set up / define releases on PR merge
 ** TODO Post about it on x.com
 
 * Stretch / Future Goals

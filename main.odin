@@ -100,6 +100,8 @@ parse_unit :: proc(s: string) -> (DurationUnit, bool) {
 		return DurationUnit.Minutes, true
 	case "h", "hr", "hrs", "hour", "hours":
 		return DurationUnit.Hours, true
+	case:
+		return DurationUnit.Minutes, true
 	}
 
 	return .Seconds, false
@@ -128,6 +130,15 @@ parse_combined :: proc(duration_str: string) -> (f64, DurationUnit, bool) {
 			// we have started to hit the actual unit string (second, minute, or hour)
 			break
 		}
+	}
+
+	// all numbers case; fail if value parses incorrectly, or else return Minutes
+	if split == len(duration_str) {
+		value, val_ok := strconv.parse_f64(duration_str[:split])
+		if !val_ok {
+			return 0, DurationUnit.Seconds, false
+		}
+		return value, DurationUnit.Minutes, true
 	}
 
 	if split == 0 || split == len(duration_str) {

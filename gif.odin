@@ -8,7 +8,7 @@ import "core:unicode/utf8"
 import gd "gifdec"
 import stb_resize "stb_resize"
 
-DITHERING_THRESHOLD_OFFSET :: 20
+DITHERING_THRESHOLD_OFFSET :: 25
 
 Animation :: struct {
 	width:       int,
