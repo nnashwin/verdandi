@@ -5,6 +5,11 @@ on:
     tags:
       'v*'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag name for release'
+        required: true
+        default: 'v0.0.0-test'
 
 jobs:
   build:
@@ -124,3 +129,4 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: artifacts/*
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
