@@ -36,6 +36,12 @@ steps:
       token: ${{ secrets.GITHUB_TOKEN }}
       release: latest
 
+  - name: Build vendor libraries (Linux)
+    if: runner.os == 'Linux'
+    run: |
+      sudo apt-get install -y make gcc
+      make -C "$(odin root)/vendor/miniaudio/src"
+
   - name: Build
     shell: bash
     run: odin build . -o:speed -out:${{ matrix.artifact }}
