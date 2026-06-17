@@ -29,24 +29,24 @@ jobs:
             target: darwin_amd64
             artifact: verdandi-mac-amd64
 
-      runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
 
-      steps:
-        - uses: actions/checkout@v4
+    steps:
+      - uses: actions/checkout@v4
 
-        - uses: laytan/setup-odin@v2
-          with:
-            token: ${{ secrets.GITHUB_TOKEN }}
-            release: latest
+      - uses: laytan/setup-odin@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          release: latest
 
-        - name: Build
-          shell: bash
-          run: odin build . -o:speed -out:${{ matrix.artifact }}
+      - name: Build
+        shell: bash
+        run: odin build . -o:speed -out:${{ matrix.artifact }}
 
-        - uses: actions/upload-artifact@v4
-          with:
-            name: ${{ matrix.artifact }}
-            path: ${{ matrix.artifact }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
 
   release:
     needs: build
