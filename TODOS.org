@@ -8,11 +8,13 @@
    CLOSED: [2026-06-15 Mon 21:39]
 ** DONE Ensure that --help dialogue has all resources necessary
    CLOSED: [2026-06-15 Mon 21:49]
-** IN-PROGRESS Write out basic readme that enables people to use and contribute
+** DONE Write out basic readme that enables people to use and contribute
+   CLOSED: [2026-06-18 Thu 08:53]
 ** TODO Create GIF to show how the timer works and add it to the readme
 ** TODO Add github actions to set up / define releases on PR merge
 ** TODO Post about it on x.com
 
 * Stretch / Future Goals
 ** TODO Add logic to allow users to import their own success gifs to use once the timer is over
+** TODO Debug Windows issues and add windows support
 ** TODO Add pause button

@@ -45,7 +45,7 @@ chmod +x verdandi-darwin-arm64
 
 ### Windows
 
-Download `verdandi-windows-amd64.exe` from the [latest release](https://github.com/yourusername/verdandi/releases/latest) and run it. Windows SmartScreen may show a warning the first time — click "More info" → "Run anyway".
+Currently not supported.  Will work on this in the future (see TODOs).
 
 ## Usage
 
