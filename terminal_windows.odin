@@ -41,7 +41,7 @@ enable_virtual_terminal :: proc() {
 	win32.SetConsoleMode(stdout, mode)
 
 	// enable utf-8 for our braille characters
-	win32.SetConsoleOutputCP(65001)
+	win32.SetConsoleOutputCP(win32.CP_UTF8)
 }
 
 get_terminal_size :: proc() -> (int, int) {
