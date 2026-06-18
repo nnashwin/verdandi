@@ -11,6 +11,10 @@
 
 Verdandi runs a countdown in your terminal and plays a sound when time's up — then loops a celebratory braille-rendered GIF until you press a key. Bring your own audio. Bring your own GIF (soon).
 
+## Demo
+
+https://github.com/user-attachments/assets/demo/final-capture-verdandi.mp4
+
 ## Features
 
 - Plain-text terminal UI — runs anywhere a terminal does
@@ -40,8 +44,6 @@ xattr -d com.apple.quarantine verdandi-darwin-arm64
 chmod +x verdandi-darwin-arm64
 ./verdandi-darwin-arm64
 ```
-
-(Replace `arm64` with `amd64` if you're on an Intel Mac.)
 
 ### Windows
 
