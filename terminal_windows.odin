@@ -8,6 +8,14 @@ orig_in_mode: win32.DWORD
 @(private = "file")
 orig_out_mode: win32.DWORD
 
+disable_raw_mode :: proc() {
+	hin := win32.GetStdHandle(win32.STD_INPUT_HANDLE)
+	hout := win32.GetStdHandle(win32.STD_OUTPUT_HANDLE)
+
+	win32.SetConsoleMode(hin, orig_in_mode)
+	win32.SetConsoleMode(hout, orig_out_mode)
+}
+
 enable_raw_mode :: proc() {
 	hin := win32.GetStdHandle(win32.STD_INPUT_HANDLE)
 	hout := win32.GetStdHandle(win32.STD_OUTPUT_HANDLE)
@@ -25,12 +33,15 @@ enable_raw_mode :: proc() {
 	win32.SetConsoleMode(hout, out_mode)
 }
 
-disable_raw_mode :: proc() {
-	hin := win32.GetStdHandle(win32.STD_INPUT_HANDLE)
-	hout := win32.GetStdHandle(win32.STD_OUTPUT_HANDLE)
+enable_virtual_terminal :: proc() {
+	stdout := win32.GetStdHandle(win32.STD_OUTPUT_HANDLE)
+	mode: win32.DWORD
+	win32.GetConsoleMode(stdout, &mode)
+	mode |= win32.ENABLE_VIRTUAL_TERMINAL_PROCESSING
+	win32.SetConsoleMode(stdout, mode)
 
-	win32.SetConsoleMode(hin, orig_in_mode)
-	win32.SetConsoleMode(hout, orig_out_mode)
+	// enable utf-8 for our braille characters
+	win32.SetConsoleOutputCP(65001)
 }
 
 get_terminal_size :: proc() -> (int, int) {

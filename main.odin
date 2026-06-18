@@ -232,6 +232,10 @@ AppState :: struct {
 }
 
 main :: proc() {
+	when ODIN_OS == .Windows {
+		enable_virtual_terminal()
+	}
+
 	// see if config directory exists
 	config_dir_name := get_config_dir()
 
@@ -420,7 +424,6 @@ main :: proc() {
 
 	os.write_string(os.stdout, HIDE_CURSOR_ON_SCREEN)
 	defer os.write_string(os.stdout, SHOW_CURSOR_ON_SCREEN)
-
 
 	clear_screen()
 

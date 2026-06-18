@@ -20,17 +20,32 @@ Verdandi runs a countdown in your terminal and plays a sound when time's up — 
 - Braille-rendered animated GIF with adaptive dithering on completion
 - Alt-screen + raw-mode terminal handling that cleans up on exit
 
-## Install
+## Installation
 
-You'll need the [Odin compiler](https://odin-lang.org/docs/install/). Then:
+### Linux
 
 ```sh
-git clone https://github.com/nnashwin/verdandi.git
-cd verdandi
-odin build . -out:verdandi
+curl -LO https://github.com/yourusername/verdandi/releases/latest/download/verdandi-linux-amd64
+chmod +x verdandi-linux-amd64
+./verdandi-linux-amd64
 ```
 
-Move the resulting `verdandi` binary somewhere on your `PATH`.
+### macOS
+
+Because Verdandi is not signed with an Apple Developer certificate, macOS will block it by default. After downloading, run:
+
+```sh
+curl -LO https://github.com/yourusername/verdandi/releases/latest/download/verdandi-darwin-arm64
+xattr -d com.apple.quarantine verdandi-darwin-arm64
+chmod +x verdandi-darwin-arm64
+./verdandi-darwin-arm64
+```
+
+(Replace `arm64` with `amd64` if you're on an Intel Mac.)
+
+### Windows
+
+Download `verdandi-windows-amd64.exe` from the [latest release](https://github.com/yourusername/verdandi/releases/latest) and run it. Windows SmartScreen may show a warning the first time — click "More info" → "Run anyway".
 
 ## Usage
 
