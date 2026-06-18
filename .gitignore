@@ -2,3 +2,4 @@ bin/*
 verdandi
 *.lib
 *.a
+*/.DS_Store
