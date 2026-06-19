@@ -13,7 +13,7 @@ Verdandi runs a countdown in your terminal and plays a sound when time's up — 
 
 ## Demo
 
-https://github.com/user-attachments/assets/demo/final-capture-verdandi.mp4
+<video src="assets/demo/final-capture-verdandi.mp4" controls width="600"></video>
 
 ## Features
 
@@ -156,6 +156,10 @@ Roadmap is tracked in [`TODOS.org`](TODOS.org).
 ## What does `verdandi` mean?
 
 In Norse mythology, **Verðandi** is one of the three Norns — the embodiment of *the present*. Fitting for a tool that helps you stay in it.
+
+## Credits
+
+The default sound effect and animation bundled with Verdandi are property of **Capcom**. All rights reserved by Capcom. These assets are not covered by this project's license.
 
 ## License
 
