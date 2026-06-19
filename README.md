@@ -13,7 +13,7 @@ Verdandi runs a countdown in your terminal and plays a sound when time's up — 
 
 ## Demo
 
-https://github.com/nnashwin/verdandi/raw/main/assets/demo/final-capture-verdandi.mp4
+https://github.com/user-attachments/assets/728e9b49-517d-463b-9b71-b5ae22d81258
 
 ## Features
 
