@@ -8,14 +8,13 @@ import "core:unicode/utf8"
 import gd "gifdec"
 import stb_resize "stb_resize"
 
-DITHERING_THRESHOLD_OFFSET :: 25
-
 Animation :: struct {
 	width:       int,
 	height:      int,
 	frame_count: int,
 	delays:      []u32,
 	pixels:      [][]u8, // [frame][width * height] grayscale
+	invert:      bool,
 }
 
 validate_gif_file :: proc(path: string) -> (valid: bool) {
@@ -40,7 +39,7 @@ apply_floyd_steinberg :: proc(pixels: []u8, w, h: int, threshold: u8) {
 	defer delete(buf)
 	for i in 0 ..< len(pixels) do buf[i] = f64(pixels[i])
 
-	size := w + h
+	size := w * h
 
 	for y in 0 ..< h {
 		for x in 0 ..< w {
@@ -58,7 +57,7 @@ apply_floyd_steinberg :: proc(pixels: []u8, w, h: int, threshold: u8) {
 					buf[idx + w - 1] += err * 3.0 / 16.0
 				}
 				if idx + w < size {
-					buf[idx + w] = err * 5.0 / 16.0
+					buf[idx + w] += err * 5.0 / 16.0
 				}
 				if x + 1 < w && idx + w + 1 < size {
 					buf[idx + w + 1] += err * 1.0 / 16.0
@@ -162,9 +161,9 @@ load_gif :: proc(path: cstring) -> (anim: Animation, ok: bool) {
 		// convert rgb to grayscale
 		gray := make([]u8, w * h)
 		for i in 0 ..< w * h {
-			r := u16(rgb_buf[i * 3 + 0])
-			g := u16(rgb_buf[i * 3 + 1])
-			b := u16(rgb_buf[i * 3 + 2])
+			r := u32(rgb_buf[i * 3 + 0])
+			g := u32(rgb_buf[i * 3 + 1])
+			b := u32(rgb_buf[i * 3 + 2])
 			// standard luminance weights
 			gray[i] = u8((r * 299 + g * 587 + b * 114) / 1000)
 		}
@@ -186,11 +185,77 @@ load_gif :: proc(path: cstring) -> (anim: Animation, ok: bool) {
 		return {}, false
 	}
 
+	// stretch contrast using the 25th to 75th percentile luminance across all
+	// frames so subjects close to their background separate cleanly; a gif
+	// whose background dominates both percentiles (already high contrast) is
+	// left untouched
+	hist: [256]int
+	total_pixels := 0
+	for frame in frames {
+		for p in frame {
+			hist[p] += 1
+			total_pixels += 1
+		}
+	}
+
+	lo := 0
+	count := 0
+	for i in 0 ..< 256 {
+		count += hist[i]
+		if count >= total_pixels * 25 / 100 {
+			lo = i
+			break
+		}
+	}
+
+	hi := 255
+	count = 0
+	for i in 0 ..< 256 {
+		count += hist[i]
+		if count >= total_pixels * 75 / 100 {
+			hi = i
+			break
+		}
+	}
+
+	if hi > lo {
+		scale := 255.0 / f64(hi - lo)
+		for frame in frames {
+			for i in 0 ..< len(frame) {
+				frame[i] = u8(clamp((f64(frame[i]) - f64(lo)) * scale, 0, 255))
+			}
+		}
+	}
+
+	// estimate background polarity from the border pixels across all frames;
+	// a dark background means the subject is light, so the render inverts it
+	// to keep the background blank and the subject dotted
+	border_sum := 0
+	border_count := 0
+	for frame in frames {
+		for x in 0 ..< w {
+			border_sum += int(frame[x])
+			border_count += 1
+			if h > 1 {
+				border_sum += int(frame[(h - 1) * w + x])
+				border_count += 1
+			}
+		}
+		if h > 2 {
+			for y in 1 ..< h - 1 {
+				border_sum += int(frame[y * w])
+				border_sum += int(frame[y * w + (w - 1)])
+				border_count += 2
+			}
+		}
+	}
+
 	anim.width = w
 	anim.height = h
 	anim.frame_count = len(frames)
 	anim.delays = delays[:]
 	anim.pixels = frames[:]
+	anim.invert = border_count > 0 && f64(border_sum) / f64(border_count) < 128.0
 
 	return anim, true
 }
@@ -199,7 +264,7 @@ grayscale_to_braille :: proc(
 	src: []u8,
 	src_w, src_h: int,
 	target_cols, target_rows: int,
-	threshold: u8,
+	invert: bool,
 ) -> string {
 
 
@@ -221,8 +286,11 @@ grayscale_to_braille :: proc(
 		1,
 	)
 
+	if invert {
+		for i in 0 ..< len(resized) do resized[i] = 255 - resized[i]
+	}
+
 	// choose threshold to calculate
-	//threshold := compute_otsu_threshold(resized) - DITHERING_THRESHOLD_OFFSET
 	threshold := compute_otsu_threshold(resized)
 
 	// dither using the adaptive threshold in order to provide correct contrast gradient (not flat)

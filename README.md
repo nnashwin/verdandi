@@ -109,7 +109,7 @@ Verdandi is a small Odin program wired to three things:
 - **[`gifdec`](https://github.com/lecram/gifdec)** — a tiny C GIF decoder, statically linked via Odin's `foreign import`, used to decode the celebratory GIF frame-by-frame.
 - **[`stb_image_resize2`](https://github.com/nothings/stb)** — also statically linked, used to scale frames to the current terminal size before they get dithered into braille glyphs.
 
-On timer completion, frames are downsampled, run through Otsu thresholding + Floyd–Steinberg dithering, and mapped to 2×4 dot braille cells so animation works in any terminal that can render Unicode.
+On timer completion, frames are normalized (percentile contrast stretch + background polarity detection), downsampled, run through Otsu thresholding + Floyd–Steinberg dithering, and mapped to 2×4 dot braille cells so animation works in any terminal that can render Unicode.
 
 ## Building from source
 

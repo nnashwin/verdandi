@@ -593,15 +593,13 @@ main :: proc() {
 					cols = int(f64(rows) / src_aspect / cell_aspect)
 				}
 
-				threshold: u8 = 128
-
 				s := grayscale_to_braille(
 					anim.pixels[state.gif_frame_index],
 					anim.width,
 					anim.height,
 					cols,
 					rows,
-					threshold,
+					anim.invert,
 				)
 
 				clear_screen()
