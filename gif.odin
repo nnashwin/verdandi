@@ -18,6 +18,22 @@ Animation :: struct {
 	pixels:      [][]u8, // [frame][width * height] grayscale
 }
 
+validate_gif_file :: proc(path: string) -> (valid: bool) {
+	cpath := strings.clone_to_cstring(path, context.temp_allocator)
+
+	gif := gd.gd_open_gif(cpath)
+	if gif == nil do return false
+	defer gd.gd_close_gif(gif)
+
+	has_frame := false
+	for {
+		result := gd.gd_get_frame(gif)
+		if result < 0 do return false
+		if result == 0 do return has_frame
+		has_frame = true
+	}
+}
+
 apply_floyd_steinberg :: proc(pixels: []u8, w, h: int, threshold: u8) {
 	// work in signed space to carry error
 	buf := make([]f64, len(pixels))
@@ -127,6 +143,8 @@ load_gif :: proc(path: cstring) -> (anim: Animation, ok: bool) {
 
 	w := int(gif.width)
 	h := int(gif.height)
+	if w <= 0 || h <= 0 do return {}, false
+
 	rgb_size := w * h * 3
 
 	// Temp buffer for RGB data from gifdec
@@ -136,7 +154,8 @@ load_gif :: proc(path: cstring) -> (anim: Animation, ok: bool) {
 	delays: [dynamic]u32
 	frames: [dynamic][]u8
 
-	for gd.gd_get_frame(gif) == 1 {
+	frame_result := gd.gd_get_frame(gif)
+	for frame_result == 1 {
 		// read rgb
 		gd.gd_render_frame(gif, raw_data(rgb_buf))
 
@@ -147,7 +166,7 @@ load_gif :: proc(path: cstring) -> (anim: Animation, ok: bool) {
 			g := u16(rgb_buf[i * 3 + 1])
 			b := u16(rgb_buf[i * 3 + 2])
 			// standard luminance weights
-			gray[i] = u8((r * 299 + g * 587 + b * 114))
+			gray[i] = u8((r * 299 + g * 587 + b * 114) / 1000)
 		}
 
 		append(&frames, gray)
@@ -156,6 +175,15 @@ load_gif :: proc(path: cstring) -> (anim: Animation, ok: bool) {
 		delay := u32(gif.gce.delay) * 10
 		if delay == 0 do delay = 100
 		append(&delays, delay)
+
+		frame_result = gd.gd_get_frame(gif)
+	}
+
+	if frame_result < 0 || len(frames) == 0 {
+		for frame in frames do delete(frame)
+		delete(frames)
+		delete(delays)
+		return {}, false
 	}
 
 	anim.width = w
@@ -194,7 +222,8 @@ grayscale_to_braille :: proc(
 	)
 
 	// choose threshold to calculate
-	threshold := compute_otsu_threshold(resized) - DITHERING_THRESHOLD_OFFSET
+	//threshold := compute_otsu_threshold(resized) - DITHERING_THRESHOLD_OFFSET
+	threshold := compute_otsu_threshold(resized)
 
 	// dither using the adaptive threshold in order to provide correct contrast gradient (not flat)
 	apply_floyd_steinberg(resized, tw, th, threshold)

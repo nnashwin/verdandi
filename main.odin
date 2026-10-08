@@ -31,6 +31,7 @@ SHOW_CURSOR_ON_SCREEN :: "\x1b[?25h"
 // ============================================================================
 
 DEFAULT_GIF :: #load("./assets/zangief-yes-gif.gif")
+CUSTOM_GIF_FILE :: "custom-gif-file.gif"
 
 DEFAULT_SOUND :: #load("./assets/default-sound-effects/zangief-laugh.mp3")
 DEFAULT_SOUND_FILE :: "custom-audio-file.mp3"
@@ -78,9 +79,11 @@ play_file :: proc(path: cstring) {
 // ============================================================================
 
 Options :: struct {
-	time:                   string `args:"pos=0,required" usage:"Duration amount. Combine with unit ('10s', '5m', '1h') or pass unit as next arg ('10 sec')."`,
+	time:                   string `args:"pos=0" usage:"Duration amount. Combine with unit ('10s', '5m', '1h') or pass unit as next arg ('10 sec')."`,
 	custom_audio_file_path: string `args:"name=audio_file_path" usage:"Path to a custom audio file (.mp3, .wav). Copies it into the config dir as the
   chime."`,
+	custom_gif_file_path:   string `args:"name=gif_file_path" usage:"Path to a custom gif file to use as the success gif. Copies it into the config dir as the
+  image."`,
 	overflow:               [dynamic]string `usage:"Optional unit when separated from amount (e.g. 'verdandi 10 sec'). Accepts: s|sec|seconds, m|min|minutes,
   h|hr|hours."`,
 }
@@ -305,6 +308,7 @@ main :: proc() {
 			fmt.println("  verdandi 25m                    # 25-minute timer")
 			fmt.println("  verdandi 10 sec                 # split form")
 			fmt.println("  verdandi --audio_file_path=bell.mp3   # set custom chime")
+			fmt.println("  verdandi --gif_file_path=celebration.gif   # set custom GIF")
 			fmt.println()
 			// fall through to flags.parse_or_exit so it prints the flag table
 			break
@@ -312,6 +316,7 @@ main :: proc() {
 	}
 	flags.parse_or_exit(&opts, os.args, .Unix)
 
+	// process a custom_audio_file_path
 	if opts.custom_audio_file_path != "" {
 		valid, ma_err_result := validate_audio_file(opts.custom_audio_file_path)
 		if !valid {
@@ -368,12 +373,56 @@ main :: proc() {
 		return
 	}
 
+	if opts.custom_gif_file_path != "" {
+		is_valid := validate_gif_file(opts.custom_gif_file_path)
+		if !is_valid {
+			fmt.printfln(
+				"invalid custom gif path.  please choose another file that is a gif to import",
+			)
+			return
+		}
+
+		data, err := os.read_entire_file(opts.custom_gif_file_path, context.temp_allocator)
+		if err != nil {
+			fmt.printfln(
+				"the custom gif file could not be read from %s.  please update your path and try again",
+				opts.custom_gif_file_path,
+			)
+			return
+		}
+
+		path, path_err := filepath.join({config_dir_name, CUSTOM_GIF_FILE})
+		if path_err != nil {
+			fmt.printfln("the custom gif path could not be created: %v", path_err)
+			return
+		}
+
+		err = os.write_entire_file(path, data)
+		if err != nil {
+			fmt.printfln(
+				"custom gif file could not be copied from %s to %s.  please check the file and try again",
+				opts.custom_gif_file_path,
+				path,
+			)
+
+			return
+		}
+
+		fmt.printfln(
+			"verdandi will now use '%s' as the gif when the timer is complete",
+			opts.custom_gif_file_path,
+		)
+
+		return
+	}
+
 	// parse duration and handle errors
 	parsed_duration, duration_is_ok := parse_duration(opts.time, opts.overflow[:])
 	if !duration_is_ok {
 		fmt.printfln(
 			"the duration you entered is invalid.  please re-enter the time duration and try again",
 		)
+		return
 	}
 
 	audio_result := init_audio_engine()
@@ -406,9 +455,22 @@ main :: proc() {
 		return
 	}
 
-	anim, ok := load_gif_from_bytes(DEFAULT_GIF)
-	if !ok {
-		fmt.eprintln("Failed to load custom GIF")
+	anim: Animation
+	gif_loaded := false
+	custom_gif_path, custom_gif_path_err := filepath.join({config_dir_name, CUSTOM_GIF_FILE})
+	if custom_gif_path_err == nil && os.exists(custom_gif_path) {
+		custom_gif_cpath := strings.clone_to_cstring(custom_gif_path, context.temp_allocator)
+		anim, gif_loaded = load_gif(custom_gif_cpath)
+		if !gif_loaded {
+			fmt.eprintln("Failed to load custom GIF; falling back to the default GIF")
+		}
+	}
+
+	if !gif_loaded {
+		anim, gif_loaded = load_gif_from_bytes(DEFAULT_GIF)
+	}
+	if !gif_loaded {
+		fmt.eprintln("Failed to load default GIF")
 		return
 	}
 	defer destroy_animation(&anim)

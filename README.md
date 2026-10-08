@@ -9,7 +9,7 @@
 
 > Watch the present; control your life.
 
-Verdandi runs a countdown in your terminal and plays a sound when time's up — then loops a celebratory braille-rendered GIF until you press a key. Bring your own audio. Bring your own GIF (soon).
+Verdandi runs a countdown in your terminal and plays a sound when time's up — then loops a celebratory braille-rendered GIF until you press a key. Bring your own audio. Bring your own GIF.
 
 ## Demo
 
@@ -21,6 +21,7 @@ https://github.com/user-attachments/assets/728e9b49-517d-463b-9b71-b5ae22d81258
 - Flexible duration parsing (`25m`, `1h`, `90 sec`, `10`)
 - Embedded default chime and GIF so it works out of the box
 - Custom chime via `--audio_file_path` (mp3, wav, flac, etc. — anything [miniaudio](https://miniaud.io) supports)
+- Custom completion animation via `--gif_file_path`
 - Braille-rendered animated GIF with adaptive dithering on completion
 - Alt-screen + raw-mode terminal handling that cleans up on exit
 
@@ -89,6 +90,16 @@ The file is stored at:
 - **Windows** — `%APPDATA%\verdandi\`
 
 To revert to the default chime, delete `custom-audio-file.*` from the config directory.
+
+## Custom GIF
+
+Set a custom completion GIF and verdandi will validate it, copy it into the config directory, and use it for subsequent runs:
+
+```sh
+verdandi --gif_file_path=./celebration.gif
+```
+
+To revert to the default animation, delete `custom-gif-file.gif` from the config directory.
 
 ## How it works
 
