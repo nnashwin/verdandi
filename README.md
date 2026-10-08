@@ -30,7 +30,7 @@ https://github.com/user-attachments/assets/728e9b49-517d-463b-9b71-b5ae22d81258
 ### Linux
 
 ```sh
-curl -LO https://github.com/yourusername/verdandi/releases/latest/download/verdandi-linux-amd64
+curl -LO https://github.com/nnashwin/verdandi/releases/latest/download/verdandi-linux-amd64
 chmod +x verdandi-linux-amd64
 ./verdandi-linux-amd64
 ```
@@ -40,7 +40,7 @@ chmod +x verdandi-linux-amd64
 Because Verdandi is not signed with an Apple Developer certificate, macOS will block it by default. After downloading, run:
 
 ```sh
-curl -LO https://github.com/yourusername/verdandi/releases/latest/download/verdandi-darwin-arm64
+curl -LO https://github.com/nnashwin/verdandi/releases/latest/download/verdandi-darwin-arm64
 xattr -d com.apple.quarantine verdandi-darwin-arm64
 chmod +x verdandi-darwin-arm64
 ./verdandi-darwin-arm64
